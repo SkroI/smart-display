@@ -2,133 +2,148 @@
 <html lang="el">
 <head>
   <meta charset="UTF-8" />
-  <title>Κλειδωμένη Οθόνη</title>
+  <title>Οθόνη Κλειδώματος</title>
   <style>
-    /* Background & center */
-    body, html {
-      margin: 0; padding: 0; height: 100%;
+    body {
+      margin: 0;
+      height: 100vh;
+      background: linear-gradient(135deg, #2d2d30, #1a1a1d);
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
         Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-      background: linear-gradient(135deg, #1c1c1e, #121214);
-      color: white;
+      color: #f0f0f5;
       display: flex;
-      flex-direction: column;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       user-select: none;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
     }
-    /* Time */
+
+    .lockscreen-container {
+      background: rgba(255 255 255 / 0.07);
+      border-radius: 24px;
+      padding: 60px 100px;
+      backdrop-filter: blur(40px);
+      box-shadow:
+        0 8px 32px rgb(0 0 0 / 0.5),
+        inset 0 0 0 1px rgb(255 255 255 / 0.15);
+      text-align: center;
+      max-width: 500px;
+      width: 90vw;
+      user-select: none;
+      z-index: 1;
+    }
+
     #time {
-      font-size: 100px;
       font-weight: 300;
-      letter-spacing: 10px;
-      margin-bottom: 20px;
-      user-select: none;
+      font-size: 96px;
+      letter-spacing: 4px;
+      line-height: 1.05;
+      margin-bottom: 12px;
+      color: #ffffffdd;
+      text-shadow: 0 1px 4px rgb(0 0 0 / 0.7);
     }
-    /* Message popup */
-    #message-popup {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 20px;
-      padding: 20px 40px;
-      max-width: 80vw;
-      font-size: 32px;
-      font-weight: 500;
-      cursor: pointer;
-      box-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
-      user-select: text;
-      display: none; /* hidden by default */
+
+    #date {
+      font-weight: 400;
+      font-size: 22px;
+      letter-spacing: 0.04em;
+      color: #c0c0c8;
       margin-bottom: 40px;
-      transition: opacity 0.3s ease;
+      text-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
     }
-    /* Show message */
-    #message-popup.visible {
-      display: block;
-    }
-    /* Alarm button */
-    #alarm-btn {
-      padding: 15px 50px;
-      font-size: 24px;
-      border-radius: 30px;
-      border: none;
-      background-color: #ff453a;
-      color: white;
-      box-shadow: 0 6px 15px rgba(255, 69, 58, 0.6);
+
+    /* Popup μήνυμα */
+    #message-popup {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255 255 255 / 0.15);
+      padding: 20px 35px;
+      border-radius: 24px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      font-size: 28px;
+      color: #f0f0f5;
       cursor: pointer;
-      user-select: none;
-      transition: background-color 0.25s ease;
+      max-width: 80vw;
+      text-align: center;
+      user-select: text;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+      backdrop-filter: blur(20px);
+      z-index: 10;
     }
-    #alarm-btn:hover {
-      background-color: #ff3b30;
+    #message-popup.visible {
+      opacity: 1;
+      pointer-events: auto;
     }
   </style>
 </head>
 <body>
+  <div class="lockscreen-container" role="main" aria-label="Οθόνη Κλειδώματος">
+    <div id="time" aria-live="polite">--:--</div>
+    <div id="date" aria-live="polite">Φόρτωση ημερομηνίας...</div>
+  </div>
 
-  <div id="time">--:--</div>
+  <div id="message-popup" role="alert" aria-live="assertive" tabindex="0"></div>
 
-  <div id="message-popup" title="Κλικ για απόκρυψη μηνύματος"></div>
-
-  <button id="alarm-btn" style="display:none;">Προειδοποίηση</button>
-
-  <audio id="notify-sound" src="ding.mp3" preload="auto"></audio>
+  <audio id="notify-sound" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" preload="auto"></audio>
 
   <script>
-    const timeEl = document.getElementById('time');
+    const timeElement = document.getElementById('time');
+    const dateElement = document.getElementById('date');
     const messagePopup = document.getElementById('message-popup');
-    const alarmBtn = document.getElementById('alarm-btn');
     const sound = document.getElementById('notify-sound');
-
-    // Update time without seconds every minute
-    function updateTime() {
-      const now = new Date();
-      // Format hh:mm, 24-hour Greek locale
-      timeEl.textContent = now.toLocaleTimeString('el-GR', {hour: '2-digit', minute: '2-digit'});
-    }
-    updateTime();
-    setInterval(updateTime, 60000);
 
     let lastMessage = '';
     let fetching = false;
 
-    // Hide message on click
-    messagePopup.addEventListener('click', () => {
-      messagePopup.classList.remove('visible');
-      alarmBtn.style.display = 'none';
-      lastMessage = '';
-    });
-
-    // Show alarm button only when message visible
-    function toggleAlarmButton(show) {
-      alarmBtn.style.display = show ? 'inline-block' : 'none';
+    function updateTimeAndDate() {
+      const now = new Date();
+      // Ώρα χωρίς δευτερόλεπτα, 24ωρη μορφή
+      timeElement.textContent = now.toLocaleTimeString('el-GR', {hour: '2-digit', minute: '2-digit', hour12: false});
+      // Ημερομηνία στα ελληνικά
+      dateElement.textContent = now.toLocaleDateString('el-GR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
     }
 
-    alarmBtn.addEventListener('click', () => {
-      window.location.href = './alarm.html';
+    setInterval(updateTimeAndDate, 1000);
+    updateTimeAndDate();
+
+    // Κλείσιμο popup με κλικ
+    messagePopup.addEventListener('click', () => {
+      messagePopup.classList.remove('visible');
     });
 
     async function fetchMessage() {
       if (fetching) return;
       fetching = true;
       try {
-        // Cache busting
-        const response = await fetch('message.txt?t=' + Date.now(), {cache: 'no-store'});
-        if (!response.ok) throw new Error('Δεν φορτώθηκε το μήνυμα');
+        const url = 'message.txt?t=' + Date.now();
+        const response = await fetch(url, {cache: 'no-store'});
+        if (!response.ok) throw new Error('Απέτυχε η λήψη');
         const text = await response.text();
-        const trimmed = text.trim();
+        const trimmedText = text.trim();
 
-        if (trimmed && trimmed !== lastMessage) {
-          lastMessage = trimmed;
-          messagePopup.textContent = trimmed;
+        if (trimmedText && trimmedText !== lastMessage) {
+          lastMessage = trimmedText;
+          messagePopup.textContent = trimmedText;
           messagePopup.classList.add('visible');
-          toggleAlarmButton(true);
 
-          // Try playing sound, catch to ignore errors if blocked
+          // Ήχος ειδοποίησης
           sound.currentTime = 0;
           sound.play().catch(() => {});
-        } else if (!trimmed) {
-          // No message, hide popup & button
+
+        } else if (!trimmedText) {
+          // Αν κενό μήνυμα, κρύβουμε το popup
           messagePopup.classList.remove('visible');
-          toggleAlarmButton(false);
           lastMessage = '';
         }
       } catch (e) {
@@ -139,8 +154,7 @@
     }
 
     fetchMessage();
-    setInterval(fetchMessage, 15000); // every 15 seconds
+    setInterval(fetchMessage, 15000);
   </script>
-
 </body>
 </html>
