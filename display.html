@@ -7,11 +7,11 @@
     body {
       margin: 0;
       height: 100vh;
-      background: url('https://c4.wallpaperflare.com/wallpaper/205/661/279/crete-agios-nikolaos-greece-europe-wallpaper-preview.jpg') no-repeat center center fixed;
+      background: url('background.jpg') no-repeat center center fixed;
       background-size: cover;
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
         Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-      color: #f0f0f5;
+      color: #000;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -22,13 +22,13 @@
     }
 
     .lockscreen-container {
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.9);
       border-radius: 24px;
       padding: 60px 100px;
-      backdrop-filter: blur(15px);
+      backdrop-filter: blur(40px);
       box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.5),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+        inset 0 0 0 1px rgba(255, 255, 255, 0.15);
       text-align: center;
       max-width: 500px;
       width: 90vw;
@@ -37,28 +37,22 @@
     }
 
     #time {
+      background: transparent;
       font-weight: 300;
       font-size: 96px;
       letter-spacing: 4px;
       line-height: 1.05;
       margin-bottom: 12px;
-      color: #000000dd;
-      text-shadow: 0 1px 4px rgba(255, 255, 255, 0.7);
-      background: rgba(255 255 255 / 0.6);
-      border-radius: 16px;
-      padding: 10px 20px;
-      display: inline-block;
-      user-select: text;
+      color: #000; /* black for contrast */
+      text-shadow: none;
     }
 
     #date {
       font-weight: 400;
       font-size: 22px;
       letter-spacing: 0.04em;
-      color: #202020cc;
+      color: #333;
       margin-bottom: 40px;
-      text-shadow: 0 1px 3px rgba(255, 255, 255, 0.5);
-      user-select: text;
     }
 
     /* Popup μήνυμα */
@@ -72,7 +66,7 @@
       border-radius: 24px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.5);
       font-size: 28px;
-      color: #f0f0f5;
+      color: #000;
       cursor: pointer;
       max-width: 80vw;
       text-align: center;
@@ -106,9 +100,7 @@
     const sound = document.getElementById('notify-sound');
 
     let lastMessage = '';
-    let fetchAbortController = null;
-    let failureCount = 0;
-    let fetchIntervalId = null;
+    let fetching = false;
 
     function updateTimeAndDate() {
       const now = new Date();
@@ -124,23 +116,17 @@
     setInterval(updateTimeAndDate, 1000);
     updateTimeAndDate();
 
-    // Close popup on click
     messagePopup.addEventListener('click', () => {
       messagePopup.classList.remove('visible');
     });
 
     async function fetchMessage() {
-      if (fetchAbortController) {
-        fetchAbortController.abort();
-      }
-      fetchAbortController = new AbortController();
-      const signal = fetchAbortController.signal;
-
+      if (fetching) return;
+      fetching = true;
       try {
         const url = 'https://raw.githubusercontent.com/SkroI/smart-display/main/message.txt?t=' + Date.now();
-        const response = await fetch(url, {cache: 'no-store', mode: 'cors', signal});
+        const response = await fetch(url, {cache: 'no-store'});
         if (!response.ok) throw new Error('Απέτυχε η λήψη');
-
         const text = await response.text();
         const trimmedText = text.trim();
 
@@ -152,26 +138,18 @@
           sound.currentTime = 0;
           sound.play().catch(() => {});
         } else if (!trimmedText) {
-          lastMessage = '';
           messagePopup.classList.remove('visible');
+          lastMessage = '';
         }
-
-        failureCount = 0;
       } catch (e) {
-        if (e.name !== 'AbortError') {
-          failureCount++;
-          console.error('Fetch error:', e);
-
-          if (failureCount >= 3) {
-            console.warn('Too many fetch failures, stopping fetch attempts.');
-            clearInterval(fetchIntervalId);
-          }
-        }
+        console.error(e);
+      } finally {
+        fetching = false;
       }
     }
 
-    fetchIntervalId = setInterval(fetchMessage, 30000);
     fetchMessage();
+    setInterval(fetchMessage, 5000);
   </script>
 </body>
 </html>
