@@ -99,11 +99,15 @@
     const sound = document.getElementById('notify-sound');
 
     let lastMessage = '';
-    let fetching = false;
+    let fetchAbortController = null;
 
     function updateTimeAndDate() {
       const now = new Date();
-      timeElement.textContent = now.toLocaleTimeString('el-GR', {hour: '2-digit', minute: '2-digit', hour12: false});
+      timeElement.textContent = now.toLocaleTimeString('el-GR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
       dateElement.textContent = now.toLocaleDateString('el-GR', {
         weekday: 'long',
         year: 'numeric',
@@ -115,18 +119,26 @@
     setInterval(updateTimeAndDate, 1000);
     updateTimeAndDate();
 
-    // Κλείσιμο popup με κλικ
     messagePopup.addEventListener('click', () => {
       messagePopup.classList.remove('visible');
     });
 
     async function fetchMessage() {
-      if (fetching) return;
-      fetching = true;
+      if (fetchAbortController) {
+        // Cancel any ongoing fetch before starting a new one
+        fetchAbortController.abort();
+      }
+
+      fetchAbortController = new AbortController();
+      const signal = fetchAbortController.signal;
+
       try {
-        // *** CHANGE THIS URL to raw GitHub content ***
         const url = 'https://raw.githubusercontent.com/SkroI/smart-display/main/message.txt?t=' + Date.now();
-        const response = await fetch(url, {cache: 'no-store'});
+        const response = await fetch(url, {
+          cache: 'no-store',
+          mode: 'cors',
+          signal
+        });
         if (!response.ok) throw new Error('Απέτυχε η λήψη');
         const text = await response.text();
         const trimmedText = text.trim();
@@ -136,23 +148,21 @@
           messagePopup.textContent = trimmedText;
           messagePopup.classList.add('visible');
 
-          // Play notification sound
           sound.currentTime = 0;
           sound.play().catch(() => {});
-
         } else if (!trimmedText) {
-          messagePopup.classList.remove('visible');
           lastMessage = '';
+          messagePopup.classList.remove('visible');
         }
       } catch (e) {
-        console.error(e);
-      } finally {
-        fetching = false;
+        if (e.name !== 'AbortError') {
+          console.error('Fetch error:', e);
+        }
       }
     }
 
     fetchMessage();
-    setInterval(fetchMessage, 5000);
+    setInterval(fetchMessage, 10000);  // 10 seconds interval to reduce rate limit risk
   </script>
 </body>
 </html>
