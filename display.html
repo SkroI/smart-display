@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Display</title>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      background: black;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      font-size: 2em;
+    }
+    #time {
+      font-size: 3em;
+      margin-bottom: 20px;
+    }
+    #message {
+      margin-top: 30px;
+      color: yellow;
+    }
+  </style>
+</head>
+<body>
+  <div id="time">Loading time...</div>
+  <div id="message">No new messages.</div>
+
+  <script>
+    let lastMessage = '';
+
+    function updateTime() {
+      const now = new Date();
+      document.getElementById('time').textContent = now.toLocaleTimeString();
+    }
+
+    async function updateMessage() {
+      try {
+        const res = await fetch('message.txt?_=' + new Date().getTime());
+        const msg = await res.text();
+        if (msg.trim() && msg !== lastMessage) {
+          document.getElementById('message').textContent = msg;
+          lastMessage = msg;
+          // Optional: play sound alert here if you add ding.mp3 and audio code
+        }
+      } catch (e) {
+        console.log('Could not fetch message.');
+      }
+    }
+
+    setInterval(updateTime, 1000);
+    setInterval(updateMessage, 5000);
+
+    updateTime();
+    updateMessage();
+  </script>
+</body>
+</html>
