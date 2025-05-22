@@ -103,9 +103,7 @@
 
     function updateTimeAndDate() {
       const now = new Date();
-      // Ώρα χωρίς δευτερόλεπτα, 24ωρη μορφή
       timeElement.textContent = now.toLocaleTimeString('el-GR', {hour: '2-digit', minute: '2-digit', hour12: false});
-      // Ημερομηνία στα ελληνικά
       dateElement.textContent = now.toLocaleDateString('el-GR', {
         weekday: 'long',
         year: 'numeric',
@@ -126,7 +124,8 @@
       if (fetching) return;
       fetching = true;
       try {
-        const url = 'message.txt?t=' + Date.now();
+        // *** CHANGE THIS URL to raw GitHub content ***
+        const url = 'https://raw.githubusercontent.com/SkroI/smart-display/main/message.txt?t=' + Date.now();
         const response = await fetch(url, {cache: 'no-store'});
         if (!response.ok) throw new Error('Απέτυχε η λήψη');
         const text = await response.text();
@@ -137,12 +136,11 @@
           messagePopup.textContent = trimmedText;
           messagePopup.classList.add('visible');
 
-          // Ήχος ειδοποίησης
+          // Play notification sound
           sound.currentTime = 0;
           sound.play().catch(() => {});
 
         } else if (!trimmedText) {
-          // Αν κενό μήνυμα, κρύβουμε το popup
           messagePopup.classList.remove('visible');
           lastMessage = '';
         }
