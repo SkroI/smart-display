@@ -4,72 +4,135 @@
   <meta charset="UTF-8" />
   <title>Smart Display</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Text&display=swap');
+
+    /* Reset */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Oxygen,
+        Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      height: 100vh;
+      background: linear-gradient(135deg, #1c1c1e, #2c2c2e);
+      color: #f0f0f5;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       text-align: center;
-      margin-top: 50px;
-      background: #f9f9f9;
-      color: #333;
+      user-select: none;
+      overflow: hidden;
+      padding: 20px;
     }
+
     #time {
-      font-size: 48px;
-      margin-bottom: 20px;
+      font-size: 96px;
+      font-weight: 300;
+      letter-spacing: 4px;
+      margin-bottom: 0.25em;
+      transition: opacity 0.5s ease;
     }
+
+    #date {
+      font-size: 24px;
+      font-weight: 400;
+      color: #a0a0a8;
+      margin-bottom: 2em;
+      transition: opacity 0.5s ease;
+    }
+
     #message {
-      font-size: 28px;
-      min-height: 60px;
-      padding: 10px 20px;
-      border: 2px solid #ccc;
-      border-radius: 8px;
-      display: inline-block;
-      max-width: 80%;
-      background: #fff;
-      box-shadow: 0 0 8px rgba(0,0,0,0.05);
+      font-size: 36px;
+      max-width: 600px;
+      background: rgba(255 255 255 / 0.1);
+      padding: 1.2em 2em;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      backdrop-filter: blur(12px);
+      opacity: 1;
+      transition: opacity 1s ease;
+      font-weight: 400;
+      min-height: 80px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #message.fade-out {
+      opacity: 0;
     }
   </style>
 </head>
 <body>
   <div id="time">--:--:--</div>
+  <div id="date">Loading date...</div>
   <div id="message">Loading message...</div>
+
+  <audio id="notify-sound" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" preload="auto"></audio>
 
   <script>
     const timeElement = document.getElementById('time');
+    const dateElement = document.getElementById('date');
     const messageElement = document.getElementById('message');
-
-    // Update time every second
-    function updateTime() {
-      const now = new Date();
-      timeElement.textContent = now.toLocaleTimeString();
-    }
-    setInterval(updateTime, 1000);
-    updateTime();
+    const sound = document.getElementById('notify-sound');
 
     let lastMessage = '';
 
+    function updateTimeAndDate() {
+      const now = new Date();
+      timeElement.textContent = now.toLocaleTimeString([], {hour12: false});
+      dateElement.textContent = now.toLocaleDateString(undefined, {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    }
+
+    setInterval(updateTimeAndDate, 1000);
+    updateTimeAndDate();
+
+    let fetching = false;
+
     async function fetchMessage() {
+      if (fetching) return;
+      fetching = true;
       try {
-        // Cache busting with timestamp query param
-        const url = 'message.txt?t=' + new Date().getTime();
-        const response = await fetch(url);
-
-        if (!response.ok) throw new Error('Network response was not ok');
-
+        const url = 'message.txt?t=' + Date.now();
+        const response = await fetch(url, {cache: 'no-store'});
+        if (!response.ok) throw new Error('Fetch failed');
         const text = await response.text();
 
-        // Update only if changed
         if (text.trim() !== lastMessage.trim()) {
-          lastMessage = text;
-          messageElement.textContent = text;
+          // Fade out old message
+          messageElement.classList.add('fade-out');
+          setTimeout(() => {
+            messageElement.textContent = text.trim();
+            messageElement.classList.remove('fade-out');
+            lastMessage = text.trim();
+
+            // Play notification sound
+            sound.currentTime = 0;
+            // Play sound only if allowed by browser (user interaction required sometimes)
+            sound.play().catch(() => {
+              // Autoplay blocked, ignore error
+            });
+          }, 800);
         }
-      } catch (error) {
-        console.error('Fetch error:', error);
+      } catch (e) {
         messageElement.textContent = 'Error loading message';
+        console.error(e);
+      } finally {
+        fetching = false;
       }
     }
 
-    // Fetch message every 15 seconds
-    fetchMessage(); // Initial fetch
-    setInterval(fetchMessage, 15000);
+    fetchMessage();
+    setInterval(fetchMessage, 15000); // fetch every 15 seconds
   </script>
 </body>
 </html>
